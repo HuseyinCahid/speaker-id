@@ -1,0 +1,23 @@
+{
+  "name": "speaker-id",
+  "version": "1.0.0",
+  "description": "This project modernizes earlier research on voice and speaker recognition by developing a web-based application capable of performing real-time speech recognition and speaker identification directly in the browser — without any cloud connection.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HuseyinCahid/speaker-id.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/HuseyinCahid/speaker-id/issues"
+  },
+  "homepage": "https://github.com/HuseyinCahid/speaker-id#readme"
+}
