@@ -24,17 +24,14 @@ Thumbs.db
 # OS junk
 *.log
 
-# Audio data (privacy + size)
-data/raw/
-data/processed/
-
-# Model files (can be large)
-models/*.pkl
-models/*.pth
-models/*.onnx
-models/*.pb
-models/*.h5
-!models/.gitkeep
+# Model files - keeping for demo purposes
+# Uncomment if you want to ignore models:
+# models/*.pkl
+# models/*.pth
+# models/*.onnx
+# models/*.pb
+# models/*.h5
+# !models/.gitkeep
 
 # Frontend
 node_modules/
