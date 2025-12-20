@@ -1,0 +1,67 @@
+# Python venv
+backend/venv/
+venv/
+**/venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.sqlite3
+
+# IDE/editor
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+
+# OS junk
+*.log
+
+# Model files - keeping for demo purposes
+# Uncomment if you want to ignore models:
+# models/*.pkl
+# models/*.pth
+# models/*.onnx
+# models/*.pb
+# models/*.h5
+# !models/.gitkeep
+
+# Frontend
+node_modules/
+.next/
+out/
+dist/
+build/
+*.log
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
