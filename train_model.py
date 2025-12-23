@@ -60,8 +60,8 @@ def create_model(model_type: str, random_state: int = 42):
             learning_rate_init=0.001,
             max_iter=500,
             random_state=random_state,
-            early_stopping=True,
-            validation_fraction=0.1
+            early_stopping=False,  # Küçük veri setlerinde sorun çıkarabiliyor
+            warm_start=False
         )
     elif model_type == 'adaboost':
         return AdaBoostClassifier(
@@ -189,14 +189,20 @@ def train_speaker_model(model_type: str = 'svm', feature_type: str = 'mfcc'):
         print("\n❌ Error: No valid audio files found!")
         return
     
-    # NumPy dizilerine çevir
-    X = np.array(features_list)
+    # NumPy dizilerine çevir ve veri tiplerini kontrol et
+    X = np.array(features_list, dtype=np.float32)  # Neural Network için float32 kullan
     y = np.array(labels_list)
+    
+    # NaN veya Inf değerleri kontrol et ve düzelt
+    if np.isnan(X).any() or np.isinf(X).any():
+        print("⚠️  Warning: NaN or Inf values found in features. Replacing with 0...")
+        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     
     print(f"\n📊 Dataset Statistics:")
     print(f"   Total samples: {len(X)}")
     print(f"   Features per sample: {X.shape[1]}")
     print(f"   Unique speakers: {len(np.unique(y))}")
+    print(f"   X dtype: {X.dtype}, y dtype: {y.dtype}")
     
     # Check if we have at least 2 speakers
     if len(np.unique(y)) < 2:
