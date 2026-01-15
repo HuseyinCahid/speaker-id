@@ -56,9 +56,27 @@ speaker-id/
 
 ### 🎯 Adım 2: Model Eğitin
 
+**Temel Eğitim:**
 ```bash
 python train_model.py
 ```
+
+**Cross-Validation ile:**
+```bash
+python train_model.py --cv --cv-folds 5
+```
+
+**Hyperparameter Tuning ile:**
+```bash
+python train_model.py --tune --tuning-method grid
+```
+
+**Her İkisi ile (Önerilen):**
+```bash
+python train_model.py --cv --cv-folds 5 --tune --tuning-method random --n-iter 20
+```
+
+**Detaylı kılavuz:** `CROSS_VALIDATION_GUIDE.md` 🆕
 
 Çıktı:
 ```
@@ -232,8 +250,9 @@ Failed to access microphone
 
 ## 📚 Daha Fazla Bilgi
 
-- Web eğitim kılavuzu: `WEB_TRAINING_GUIDE.md` ⭐ YENİ!
+- Web eğitim kılavuzu: `WEB_TRAINING_GUIDE.md` ⭐
 - Komut satırı eğitim: `TRAINING_GUIDE.md`
+- **Cross-Validation & Tuning: `CROSS_VALIDATION_GUIDE.md`** 🆕
 - API dokümantasyonu: `http://localhost:8000/docs`
 - Proje durumu: `PROJECT_STATUS.md`
 

@@ -25,7 +25,13 @@ import pickle
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import (
+    train_test_split, 
+    StratifiedKFold, 
+    cross_val_score,
+    GridSearchCV,
+    RandomizedSearchCV
+)
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, f1_score
 from audio_processor import AudioProcessor  # type: ignore
 
@@ -60,8 +66,8 @@ def create_model(model_type: str, random_state: int = 42):
             learning_rate_init=0.001,
             max_iter=500,
             random_state=random_state,
-            early_stopping=False,  # Küçük veri setlerinde sorun çıkarabiliyor
-            warm_start=False
+            early_stopping=True,
+            validation_fraction=0.1
         )
     elif model_type == 'adaboost':
         return AdaBoostClassifier(
@@ -85,13 +91,89 @@ def get_model_filename(model_type: str, feature_type: str = 'mfcc') -> str:
     return f'{base_name}_speaker_model.pkl'
 
 
-def train_speaker_model(model_type: str = 'svm', feature_type: str = 'mfcc'):
+def get_hyperparameter_grid(model_type: str):
+    """
+    Her model tipi için hyperparameter grid döndür.
+    
+    Args:
+        model_type: Model tipi
+        
+    Returns:
+        Hyperparameter grid dictionary
+    """
+    if model_type == 'svm':
+        return {
+            'C': [0.1, 1, 10, 100],
+            'gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1],
+            'kernel': ['rbf', 'poly', 'sigmoid']
+        }
+    elif model_type == 'random_forest':
+        return {
+            'n_estimators': [50, 100, 200],
+            'max_depth': [10, 20, 30, None],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4]
+        }
+    elif model_type == 'neural_network':
+        return {
+            'hidden_layer_sizes': [(64,), (128,), (128, 64), (256, 128)],
+            'alpha': [0.0001, 0.001, 0.01],
+            'learning_rate_init': [0.0001, 0.001, 0.01],
+            'activation': ['relu', 'tanh']
+        }
+    elif model_type == 'adaboost':
+        return {
+            'n_estimators': [25, 50, 100],
+            'learning_rate': [0.5, 1.0, 1.5, 2.0]
+        }
+    else:
+        return {}
+
+
+def perform_cross_validation(model, X, y, cv_folds: int = 5):
+    """
+    Cross-validation performansını hesapla.
+    
+    Args:
+        model: Eğitilmemiş model
+        X: Özellik matrisi
+        y: Etiket vektörü
+        cv_folds: Cross-validation fold sayısı
+        
+    Returns:
+        CV skorları ve ortalama/std
+    """
+    cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
+    cv_scores = cross_val_score(model, X, y, cv=cv, scoring='accuracy', n_jobs=-1)
+    
+    return {
+        'cv_scores': cv_scores.tolist(),
+        'cv_mean': float(np.mean(cv_scores)),
+        'cv_std': float(np.std(cv_scores)),
+        'cv_folds': cv_folds
+    }
+
+
+def train_speaker_model(
+    model_type: str = 'svm', 
+    feature_type: str = 'mfcc',
+    use_cv: bool = False,
+    cv_folds: int = 5,
+    use_tuning: bool = False,
+    tuning_method: str = 'grid',
+    n_iter: int = 20
+):
     """
     Ana eğitim fonksiyonu.
     
     Args:
         model_type: Model tipi ('svm', 'random_forest', 'neural_network', 'adaboost')
         feature_type: Özellik tipi ('mfcc' - Mel desteği kaldırıldı)
+        use_cv: Cross-validation kullan (default: False)
+        cv_folds: Cross-validation fold sayısı (default: 5)
+        use_tuning: Hyperparameter tuning kullan (default: False)
+        tuning_method: Tuning yöntemi ('grid' veya 'random', default: 'grid')
+        n_iter: RandomizedSearchCV için iterasyon sayısı (default: 20)
     """
     model_names = {
         'svm': 'SVM (Support Vector Machine)',
@@ -114,6 +196,14 @@ def train_speaker_model(model_type: str = 'svm', feature_type: str = 'mfcc'):
     print("=" * 50)
     print(f"📦 Model Tipi: {model_names.get(model_type, model_type)}")
     print(f"🎵 Özellik Tipi: {feature_names.get(feature_type, feature_type)}")
+    if use_cv:
+        print(f"🔄 Cross-Validation: ✅ ({cv_folds} folds)")
+    else:
+        print(f"🔄 Cross-Validation: ❌")
+    if use_tuning:
+        print(f"🎯 Hyperparameter Tuning: ✅ ({tuning_method})")
+    else:
+        print(f"🎯 Hyperparameter Tuning: ❌")
     print("=" * 50)
     
     # Yollar
@@ -189,20 +279,14 @@ def train_speaker_model(model_type: str = 'svm', feature_type: str = 'mfcc'):
         print("\n❌ Error: No valid audio files found!")
         return
     
-    # NumPy dizilerine çevir ve veri tiplerini kontrol et
-    X = np.array(features_list, dtype=np.float32)  # Neural Network için float32 kullan
+    # NumPy dizilerine çevir
+    X = np.array(features_list)
     y = np.array(labels_list)
-    
-    # NaN veya Inf değerleri kontrol et ve düzelt
-    if np.isnan(X).any() or np.isinf(X).any():
-        print("⚠️  Warning: NaN or Inf values found in features. Replacing with 0...")
-        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     
     print(f"\n📊 Dataset Statistics:")
     print(f"   Total samples: {len(X)}")
     print(f"   Features per sample: {X.shape[1]}")
     print(f"   Unique speakers: {len(np.unique(y))}")
-    print(f"   X dtype: {X.dtype}, y dtype: {y.dtype}")
     
     # Check if we have at least 2 speakers
     if len(np.unique(y)) < 2:
@@ -220,10 +304,65 @@ def train_speaker_model(model_type: str = 'svm', feature_type: str = 'mfcc'):
     print(f"   Training samples: {len(X_train)}")
     print(f"   Test samples: {len(X_test)}")
     
-    # Model oluştur ve eğit
-    print(f"\n🤖 Training {model_names.get(model_type, model_type)} model...")
-    model = create_model(model_type)
-    model.fit(X_train, y_train)
+    # Cross-validation (eğer istenirse)
+    cv_results = None
+    if use_cv:
+        print(f"\n🔄 Performing {cv_folds}-fold Cross-Validation...")
+        base_model = create_model(model_type)
+        cv_results = perform_cross_validation(base_model, X_train, y_train, cv_folds)
+        print(f"   CV Mean Accuracy: {cv_results['cv_mean']:.4f} ({cv_results['cv_mean']*100:.2f}%)")
+        print(f"   CV Std: {cv_results['cv_std']:.4f} ({cv_results['cv_std']*100:.2f}%)")
+        print(f"   CV Scores: {[f'{s:.4f}' for s in cv_results['cv_scores']]}")
+    
+    # Hyperparameter tuning (eğer istenirse)
+    best_params = None
+    if use_tuning:
+        print(f"\n🎯 Performing Hyperparameter Tuning ({tuning_method})...")
+        param_grid = get_hyperparameter_grid(model_type)
+        
+        if not param_grid:
+            print(f"   ⚠️  No hyperparameter grid defined for {model_type}, skipping tuning")
+            use_tuning = False
+        else:
+            base_model = create_model(model_type)
+            cv = StratifiedKFold(n_splits=min(5, cv_folds), shuffle=True, random_state=42)
+            
+            if tuning_method == 'grid':
+                search = GridSearchCV(
+                    base_model, 
+                    param_grid, 
+                    cv=cv, 
+                    scoring='accuracy',
+                    n_jobs=-1,
+                    verbose=1
+                )
+            else:  # random
+                search = RandomizedSearchCV(
+                    base_model,
+                    param_grid,
+                    cv=cv,
+                    scoring='accuracy',
+                    n_iter=n_iter,
+                    n_jobs=-1,
+                    random_state=42,
+                    verbose=1
+                )
+            
+            print(f"   Searching through {len(param_grid)} parameter combinations...")
+            search.fit(X_train, y_train)
+            best_params = search.best_params_
+            model = search.best_estimator_
+            
+            print(f"   ✅ Best parameters found:")
+            for param, value in best_params.items():
+                print(f"      {param}: {value}")
+            print(f"   Best CV Score: {search.best_score_:.4f} ({search.best_score_*100:.2f}%)")
+    
+    # Model oluştur ve eğit (tuning yapılmadıysa)
+    if not use_tuning:
+        print(f"\n🤖 Training {model_names.get(model_type, model_type)} model...")
+        model = create_model(model_type)
+        model.fit(X_train, y_train)
     
     # Değerlendirme
     train_score = model.score(X_train, y_train)
@@ -286,6 +425,15 @@ def train_speaker_model(model_type: str = 'svm', feature_type: str = 'mfcc'):
         'confusion_matrix': cm.tolist(),  # JSON serializable yapmak için
         'speakers': sorted(np.unique(y).tolist())  # Konuşmacı listesi
     }
+    
+    # Cross-validation sonuçlarını ekle
+    if cv_results:
+        metadata['cross_validation'] = cv_results
+    
+    # Hyperparameter tuning sonuçlarını ekle
+    if best_params:
+        metadata['best_hyperparameters'] = best_params
+        metadata['hyperparameter_tuning_method'] = tuning_method
     metadata_path = models_dir / f'{model_filename}.meta'
     with open(metadata_path, 'w', encoding='utf-8') as f:
         import json
@@ -323,7 +471,44 @@ if __name__ == "__main__":
         choices=['mfcc'],  # Mel desteği kaldırıldı
         help='Kullanılacak özellik tipi: mfcc (default: mfcc, Mel desteği kaldırıldı)'
     )
+    parser.add_argument(
+        '--cv',
+        action='store_true',
+        help='Cross-validation kullan (default: False)'
+    )
+    parser.add_argument(
+        '--cv-folds',
+        type=int,
+        default=5,
+        help='Cross-validation fold sayısı (default: 5)'
+    )
+    parser.add_argument(
+        '--tune',
+        action='store_true',
+        help='Hyperparameter tuning kullan (default: False)'
+    )
+    parser.add_argument(
+        '--tuning-method',
+        type=str,
+        default='grid',
+        choices=['grid', 'random'],
+        help='Hyperparameter tuning yöntemi: grid veya random (default: grid)'
+    )
+    parser.add_argument(
+        '--n-iter',
+        type=int,
+        default=20,
+        help='RandomizedSearchCV için iterasyon sayısı (default: 20)'
+    )
     
     args = parser.parse_args()
-    train_speaker_model(model_type=args.model, feature_type=args.feature)
+    train_speaker_model(
+        model_type=args.model, 
+        feature_type=args.feature,
+        use_cv=args.cv,
+        cv_folds=args.cv_folds,
+        use_tuning=args.tune,
+        tuning_method=args.tuning_method,
+        n_iter=args.n_iter
+    )
 

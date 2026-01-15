@@ -58,22 +58,66 @@ The frontend will be available at `http://localhost:3000`
 5. Click the stop button
 6. The audio will be sent to the backend for prediction
 
+## Model Training
+
+### Basic Training
+```bash
+# Train SVM model (default)
+python train_model.py
+
+# Train specific model type
+python train_model.py --model random_forest
+python train_model.py --model neural_network
+python train_model.py --model adaboost
+```
+
+### With Cross-Validation
+```bash
+# 5-fold cross-validation
+python train_model.py --model svm --cv --cv-folds 5
+
+# 3-fold cross-validation (faster)
+python train_model.py --model svm --cv --cv-folds 3
+```
+
+### With Hyperparameter Tuning
+```bash
+# Grid Search (comprehensive but slower)
+python train_model.py --model svm --tune --tuning-method grid
+
+# Random Search (faster, good for large grids)
+python train_model.py --model svm --tune --tuning-method random --n-iter 20
+```
+
+### Combined (Recommended)
+```bash
+# Cross-validation + Hyperparameter tuning
+python train_model.py --model svm --cv --cv-folds 5 --tune --tuning-method random --n-iter 20
+```
+
+**See `CROSS_VALIDATION_GUIDE.md` for detailed usage.**
+
 ## Current Status
 
 ✅ **Completed:**
 - Project structure
 - Backend API with audio processing
 - Frontend UI with Web Audio API
-- MFCC and Mel-spectrogram feature extraction
+- MFCC feature extraction
+- Model training with multiple algorithms (SVM, Random Forest, Neural Network, AdaBoost)
+- **Cross-validation support** 🆕
+- **Hyperparameter tuning (Grid Search & Random Search)** 🆕
+- Web-based model training interface
+- Model analytics and visualization
 
 🚧 **In Progress:**
-- Model training with actual data
-- Model deployment
+- Model deployment optimization
+- Browser-side inference
 
 📋 **Next Steps:**
 1. Collect/download audio dataset
-2. Train speaker identification models
-3. Deploy models to backend
+2. Train models with cross-validation and tuning
+3. Deploy optimized models to backend
 4. Optimize for browser deployment
 
 ## Troubleshooting
